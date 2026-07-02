@@ -1,0 +1,34 @@
+name: CI/CD for ERPNext
+
+on:
+  push:
+    branches:
+      - '**'  # matches all branches
+
+jobs:
+  deploy:
+    # This is the key line to only run if matches the branch listed in the variable
+    if: github.ref_name == vars.DEPLOY_BRANCH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start SSH Agent and Add Private Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Verify SSH Key is Loaded
+        run: ssh-add -l
+
+      - name: Run Deployment Script on Remote Server
+        env:
+          DEPLOY_SERVER_USER: ${{ vars.DEPLOY_SERVER_USER }}
+          DEPLOY_SERVER_IP: ${{ vars.DEPLOY_SERVER_IP }}
+          REMOTE_DEPLOY_SCRIPT_PATH: ${{ vars.REMOTE_DEPLOY_SCRIPT_PATH }}
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+          $DEPLOY_SERVER_USER@$DEPLOY_SERVER_IP \
+          "bash $REMOTE_DEPLOY_SCRIPT_PATH"

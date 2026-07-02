@@ -1,0 +1,139 @@
+name: Manage Issues Based on Linked PRs and Checkboxes
+
+on:
+  pull_request:
+    types:
+      - opened
+      - closed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  manage-issue:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v4
+      # Step 2: Debug repository context
+      - name: Debug repository context
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Owner: ${{ github.repository_owner }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Action: ${{ github.event.action }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "PR Merged: ${{ github.event.pull_request.merged }}"
+          gh repo view "${{ github.repository }}" || echo "Error: Failed to view repository"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      # Step 3: Extract issue numbers from commit messages
+      - name: Extract issue numbers from commit messages
+        id: extract-issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          commits=$(gh api repos/${{ github.repository }}/pulls/$pr_number/commits --jq '.[].commit.message')
+          echo "Commit messages:"
+          echo "$commits"
+          raw_issues=$(echo "$commits" | grep -oE '#[0-9]+' | sed 's/#//' | sort -u)
+          if [[ -z "$raw_issues" ]]; then
+            echo "No issues found in commit messages. Exiting."
+            exit 0
+          fi
+          valid_issues=()
+          for issue in $raw_issues; do
+            if [[ "$issue" =~ ^[0-9]+$ ]]; then
+              api_response=$(gh api repos/${{ github.repository }}/issues/$issue --jq '{state: .state, is_pr: (.pull_request != null)}' || echo '{"state":null,"is_pr":null}')
+              state=$(echo "$api_response" | jq -r '.state')
+              is_pr=$(echo "$api_response" | jq -r '.is_pr')
+              if [[ "$state" == "null" ]]; then
+                echo "Issue #$issue does not exist, skipping"
+                continue
+              fi
+              if [[ "$is_pr" == "false" ]]; then
+                valid_issues+=("$issue")
+                echo "Valid issue #$issue (state: $state) added for processing"
+              else
+                echo "Reference #$issue is a PR, skipping (only issues allowed)"
+              fi
+             else
+               echo "Invalid issue number: $issue, skipping"
+             fi
+          done
+          if [[ ${#valid_issues[@]} -eq 0 ]]; then
+            echo "No valid issues found. Exiting."
+            exit 0
+          fi
+          issues_csv=$(echo "${valid_issues[*]}" | tr ' ' ',')
+          echo "issues=$issues_csv" >> $GITHUB_OUTPUT
+          echo "Final valid issues: $issues_csv"
+      # Step 4: Check and manage issues with checkbox validation
+      - name: Check and manage issues
+        if: steps.extract-issues.outputs.issues != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x  # Enable debug logging
+          issues="${{ steps.extract-issues.outputs.issues }}"
+          IFS=',' read -ra issue_array <<< "$issues"
+          current_pr="${{ github.event.pull_request.number }}"
+          for issue in "${issue_array[@]}"; do
+            echo "Processing issue #$issue"
+            issue_state=$(gh api repos/${{ github.repository }}/issues/$issue --jq '.state' || echo "error")
+            echo "Issue #$issue state: $issue_state"
+            if [[ "$issue_state" == "error" ]]; then
+              echo "Error: Issue #$issue not found or inaccessible"
+              continue
+            fi
+            # Fetch issue body to check for checkboxes
+            issue_body=$(gh api repos/${{ github.repository }}/issues/$issue --jq '.body // ""')
+            echo "Issue #$issue body fetched"
+            # Count unchecked checkboxes (e.g., "- [ ]")
+            unchecked_count=$(echo "$issue_body" | grep -c '^[[:space:]]*- \[ \]' || true)
+            if [[ -z "$unchecked_count" ]]; then
+              unchecked_count=0
+            fi
+            echo "Issue #$issue has $unchecked_count unchecked checkboxes"
+            # Check for other open PRs referencing this issue
+            open_prs=$(gh api repos/${{ github.repository }}/pulls?state=open --paginate --jq ".[] | select(.number != $current_pr) | .number")
+            has_other_prs=false
+            for pr in $open_prs; do
+              commits=$(gh api repos/${{ github.repository }}/pulls/$pr/commits --jq '.[].commit.message')
+              if echo "$commits" | grep -q "#$issue"; then
+                echo "Issue #$issue referenced in open PR #$pr"
+                has_other_prs=true
+                break
+              fi
+            done
+            echo "Event action: ${{ github.event.action }}"
+            echo "PR merged: ${{ github.event.pull_request.merged }}"
+            echo "has_other_prs: $has_other_prs"
+            if [[ "${{ github.event.action }}" == "opened" ]]; then
+              if [[ "$issue_state" == "closed" ]]; then
+                echo "Reopening closed issue #$issue"
+                gh issue reopen "$issue" --repo "${{ github.repository }}" --comment "Reopened due to commit(s) in PR #$current_pr" || echo "Error: Failed to reopen issue #$issue"
+              else
+                echo "Issue #$issue is already open"
+              fi
+            elif [[ "${{ github.event.action }}" == "closed" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+              if [[ "$has_other_prs" == "false" && "$issue_state" == "open" ]]; then
+                if [[ "$unchecked_count" -eq 0 ]]; then
+                  echo "Closing issue #$issue as PR was merged, no other open PRs reference it, and all checkboxes are ticked"
+                  gh issue close "$issue" --repo "${{ github.repository }}" --comment "Closed due to merged PR (#$current_pr) with all checkboxes ticked" || echo "Error: Failed to close issue #$issue"
+                else
+                  echo "Keeping issue #$issue open because $unchecked_count unchecked checkboxes remain"
+                  gh issue comment "$issue" --repo "${{ github.repository }}" --body "Cannot close issue: $unchecked_count unchecked checkboxes remain after merging PR #$current_pr"
+                fi
+              else
+                echo "Keeping issue #$issue open due to other active PRs or issue already closed"
+              fi
+            else
+              echo "No action taken for issue #$issue (event: ${{ github.event.action }}, merged: ${{ github.event.pull_request.merged }})"
+            fi
+          done

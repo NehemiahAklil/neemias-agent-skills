@@ -1,0 +1,53 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+prerelease: true
+include-pre-releases: true 
+
+template: |
+  # What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+categories:
+  - title: 'Breaking Changes'
+    labels:
+      - 'Major'
+  - title: 'Enhancements'
+    labels:
+      - 'Enhancement'
+      - 'Dev Task'
+      - 'Feature'
+      - 'Dev Process Optimization'
+  - title: 'Bug Fixes'
+    labels:
+      - 'Bug'
+      - 'Hot Fix'
+  - title: 'Tasks'
+    labels:
+      - 'Task'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+
+version-resolver:
+  major:
+    labels: 
+      - 'Major'
+  minor:
+    labels:
+      - 'Enhancement'
+      - 'Dev Task'
+      - 'Feature'
+      - 'Dev Process Optimization'
+  patch:
+    labels:
+      - 'Bug'
+      - 'Hot Fix'
+      - 'Task'
+      - 'Security'
+  default: patch
+
+exclude-labels:
+  - 'Skip-Changelog'
+
