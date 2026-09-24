@@ -71,6 +71,13 @@ gh issue comment <issueNumber> --body-file /tmp/issue-comment.md
 
 ---
 
+## No agent attribution
+
+The agent is a ghost. **Never** add Claude/Anthropic attribution to an issue —
+not in the title, the body, or any issue comment. No "Generated with Claude
+Code" line, no 🤖 badge, no `Co-Authored-By`/`Co-authored-by` footer. Every
+issue and comment reads as if the developer wrote it.
+
 ## Keeping issues current
 
 As implementation proceeds, keep the issue's task checklist and "Files Touched"

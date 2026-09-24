@@ -59,6 +59,13 @@ the fast-path section in `SKILL.md`.)
 Refs #<issueNumber>
 ```
 
+## No agent attribution
+
+The agent is a ghost. **Never** add Claude/Anthropic attribution to the PR —
+not in the title, the body, or any PR comment. No "Generated with Claude Code"
+line, no 🤖 badge, no `Co-Authored-By`/`Co-authored-by` footer. The PR reads as
+if the developer opened it themselves.
+
 ## If a PR already exists
 
 If an open PR for this branch already exists, **don't duplicate it.** Note that
