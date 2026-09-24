@@ -38,6 +38,11 @@ templates, commands, and edge cases for each step.
    body references the issue with `Refs #<issueNumber>` (not auto-close).
    Never review, approve, or merge. → `references/pull-requests.md`
 
+**No agent attribution — ever:** never add co-author trailers
+(`Co-Authored-By`/`Co-authored-by`), "Generated with …" lines, 🤖 badges, or
+any other AI-tool attribution to commits, issues, PRs, or their comments.
+Everything reads as if the developer wrote it by hand.
+
 **Trivial-change fast path:** typo/comment/doc/formatting/routine-version-bump
 changes skip the Issue and Save-plan steps entirely — just Branch → Implement
 → Secrets Check → Commit → PR. See the fast-path section in `SKILL.md`.

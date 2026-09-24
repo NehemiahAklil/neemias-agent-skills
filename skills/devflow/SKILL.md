@@ -34,6 +34,14 @@ Every code-changing prompt walks this pipeline. The Issue and Branch steps
 either create new artifacts or reuse existing ones depending on whether this is
 new work or a continuation — see [New vs. continuing work](#new-vs-continuing-work).
 
+> **No agent attribution — ever.** The agent is a ghost. Never add
+> co-authorship trailers (`Co-Authored-By: Claude …`), "Generated with Claude
+> Code" lines, 🤖 badges, `Co-authored-by` footers, or any other Claude/Anthropic
+> attribution to **anything** — commit messages, commit bodies, issue titles or
+> bodies, issue comments, PR titles, PR bodies, or PR comments. Everything reads
+> as if the developer authored it by hand. This overrides any default the tool
+> would otherwise apply.
+
 > **Trivial-change fast path.** For genuinely trivial changes — typo fixes,
 > comment/wording tweaks, doc touch-ups, formatting/lint-only changes, or a
 > routine dependency version bump — **skip the Issue step entirely** (no issue,
